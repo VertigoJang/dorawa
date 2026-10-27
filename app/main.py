@@ -397,7 +397,15 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    # Wayland에서 작업표시줄이 .desktop 파일로 아이콘을 찾도록 ID 고정
+    try:
+        from PySide6.QtGui import QGuiApplication
+        QGuiApplication.setDesktopFileName("dorawa")
+    except Exception:
+        pass
     app = QApplication(sys.argv)
+    app.setApplicationName("Dorawa")
+    app.setApplicationDisplayName("Dorawa")
     if icon_path():
         app.setWindowIcon(QIcon(icon_path()))
     w = MainWindow()
