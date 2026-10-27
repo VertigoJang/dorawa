@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Dorawa
+Comment=노트북 도난 추적기
+Exec=/opt/dorawa-app/Dorawa
+Icon=dorawa
+Terminal=false
+Categories=Utility;Security;

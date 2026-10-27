@@ -1,0 +1,9 @@
+[Unit]
+Description=Run Dorawa agent periodically
+
+[Timer]
+OnBootSec=30sec
+OnUnitInactiveSec=5sec
+
+[Install]
+WantedBy=timers.target

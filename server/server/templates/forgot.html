@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>비밀번호 찾기</h1>
+<p class="muted">가입한 이메일을 입력하면 재설정 코드를 보냅니다.</p>
+{% if error %}<div class="err">{{ error }}</div>{% endif %}
+<form method="post" class="card">
+  <input name="email" type="email" placeholder="가입한 이메일" autofocus>
+  <button type="submit">재설정 코드 받기</button>
+</form>
+<p class="muted"><a href="{{ url_for('login') }}">← 로그인으로</a></p>
+{% endblock %}

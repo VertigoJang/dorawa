@@ -1,0 +1,11 @@
+# Dorawa 윈도우 실행본(.exe) 빌드 안내
+# (윈도우 PC에서, 파이썬 설치된 상태)
+
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt pyinstaller
+pyinstaller --clean --noconfirm dorawa.spec
+
+# 결과: dist\Dorawa.exe  (더블클릭 실행)
+# 주의: '이 기기 보호' 탭의 에이전트 설치는 리눅스(pkexec) 기준이라,
+#       윈도우 에이전트 제어는 아직 미구현 — '내 기기 추적'은 정상 동작.

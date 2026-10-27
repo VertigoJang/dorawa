@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block body %}
+{% if dev['lost'] %}
+<meta http-equiv="refresh" content="15">
+{% endif %}
+<h1>{{ dev['name'] or '이름없음' }}</h1>
+<p><a href="{{ url_for('dashboard') }}">← 목록</a></p>
+
+<div class="card">
+  {% if dev['lost'] %}
+    <p class="err">🚨 도난 모드 켜짐 — 노트북이 주기적으로 보고합니다.
+       <span class="muted">(이 페이지는 15초마다 자동 새로고침됩니다)</span></p>
+    <form method="post" action="{{ url_for('device_lost', did=dev['id']) }}">
+      <input type="hidden" name="lost" value="0">
+      <button class="btn-gray" type="submit">도난 모드 끄기</button>
+    </form>
+  {% else %}
+    <p>평상시 대기 중.</p>
+    <form method="post" action="{{ url_for('device_lost', did=dev['id']) }}">
+      <input type="hidden" name="lost" value="1">
+      <button class="btn-danger" type="submit">🚨 도난 모드 켜기</button>
+    </form>
+  {% endif %}
+</div>
+
+{% if dev['lost'] %}
+<div class="card">
+  <h2>원격 촬영</h2>
+  <p class="muted">버튼을 누르면 노트북이 다음 확인(최대 1분) 때 촬영해 올립니다.</p>
+  <form method="post" action="{{ url_for('device_capture', did=dev['id']) }}" style="display:inline">
+    <input type="hidden" name="cmd" value="photo">
+    <button type="submit">📷 사진 찍기</button>
+  </form>
+  <form method="post" action="{{ url_for('device_capture', did=dev['id']) }}" style="display:inline">
+    <input type="hidden" name="cmd" value="video">
+    <button type="submit">🎥 10초 영상</button>
+  </form>
+  {% if dev['pending_cmd'] %}
+    <p class="muted">⏳ 대기 중인 명령: {{ dev['pending_cmd'] }} (곧 촬영됩니다)</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>촬영 모드</h2>
+  <form method="post" action="{{ url_for('device_camera_mode', did=dev['id']) }}">
+    <label class="radio-row">
+      <input type="radio" name="mode" value="remote"
+        {% if dev['camera_mode'] != 'auto' %}checked{% endif %}>
+      <span>원격 촬영만 (내가 누를 때만, 권장)</span>
+    </label>
+    <label class="radio-row">
+      <input type="radio" name="mode" value="auto"
+        {% if dev['camera_mode'] == 'auto' %}checked{% endif %}>
+      <span>자동 촬영
+        <input type="number" name="interval" value="{{ dev['auto_interval'] }}"
+               min="1" max="60" style="width:56px"> 분마다</span>
+    </label>
+    <button type="submit" class="btn-gray" style="margin-top:10px">저장</button>
+  </form>
+  <p class="muted">자동 촬영은 주기마다 카메라 불빛이 깜빡입니다. 원격 촬영은 누를 때만 켜집니다.</p>
+</div>
+
+<div class="card">
+  <h2>최근 보고</h2>
+  {% if not reports %}<p class="muted">아직 보고가 없습니다.</p>{% endif %}
+  {% for r in reports %}
+    <div style="border-top:1px solid #eee; padding:10px 0;">
+      <div class="muted">{{ r['ts']|kst }}</div>
+      <div>IP: {{ r['public_ip'] or '?' }} ({{ r['ip_desc'] or '' }})</div>
+      {% if r['lat'] %}
+        <div>📍 <a href="https://maps.google.com/?q={{ r['lat'] }},{{ r['lng'] }}" target="_blank">지도 열기</a>
+             (오차 약 {{ r['accuracy']|int }}m)</div>
+      {% endif %}
+      {% if r['photo'] %}
+        <div><img src="{{ url_for('photo', name=r['photo']) }}" style="max-width:100%;border-radius:6px;margin-top:6px;"></div>
+      {% endif %}
+      {% if r['video'] %}
+        <div><video controls style="max-width:100%;border-radius:6px;margin-top:6px;"
+             src="{{ url_for('video', name=r['video']) }}"></video></div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

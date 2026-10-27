@@ -1,0 +1,21 @@
+# 파이썬
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 빌드 산출물
+build/
+dist/
+*.spec.bak
+
+# 로컬 데이터·비밀 (절대 커밋 금지)
+server/server/data/
+*.db
+*.env
+*.conf
+~/.config/dorawa-app.json
+
+# OS
+.DS_Store
+Thumbs.db

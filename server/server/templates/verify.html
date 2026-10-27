@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>이메일 인증</h1>
+<p class="muted">입력하신 이메일로 6자리 코드를 보냈습니다. 받은 코드를 입력하세요.</p>
+{% if error %}<div class="err">{{ error }}</div>{% endif %}
+<form method="post" class="card">
+  <input name="code" placeholder="6자리 코드" inputmode="numeric" autofocus
+         style="font-size:24px; letter-spacing:4px; text-align:center;">
+  <button type="submit">인증하기</button>
+</form>
+<form method="post" action="{{ url_for('verify_resend') }}">
+  <button type="submit" class="btn-gray">코드 다시 보내기</button>
+</form>
+{% endblock %}

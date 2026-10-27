@@ -1,0 +1,8 @@
+[Unit]
+Description=Dorawa theft tracker agent
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/dorawa/agent.py

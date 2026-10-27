@@ -1,0 +1,34 @@
+# Dorawa 설정 파일 예시
+# 실제 파일은 /etc/dorawa/dorawa.conf 에 두고 chmod 600 (root만 읽기)
+# 설치 후 setup.py 마법사로 자동 생성하는 것을 권장.
+
+[general]
+# 사용할 채널(쉼표로 여러 개). 명령(/lost 등)은 ntfy에서만 받는다.
+#   ntfy            : 보고 + 명령 (메인 권장)
+#   discord         : 보고만 (웹훅, 명령 불가)
+#   ntfy, discord   : 둘 다 — ntfy로 명령, 보고는 양쪽에
+channels = ntfy
+interval_sec = 300
+
+[ntfy]
+# server 는 공식 서버(기본) 또는 자체 서버 주소
+server = https://ntfy.sh
+# topic 은 추측하기 어려운 긴 이름을 쓸 것 (이게 사실상 비밀번호 역할)
+topic =
+# token 은 선택 (ntfy 서버에 인증을 건 경우만)
+token =
+
+[discord]
+# 채널 설정 > 연동 > 웹후크 에서 만든 URL
+webhook_url =
+
+[features]
+# 웹캠 촬영: 타인(도둑) 얼굴이 찍히므로 기본 꺼짐. 켜려면 true.
+webcam = false
+# 와이파이 위치 추정: beacondb | wigle | off
+wifi_location = beacondb
+
+[wigle]
+# wifi_location = wigle 일 때만 사용. 본인 WiGLE 계정에서 발급.
+api_name =
+api_token =
