@@ -4,11 +4,15 @@
 
 block_cipher = None
 
+import os
+# 윈도우는 .ico, 그 외(리눅스)는 아이콘 지정 생략(런타임 setWindowIcon로 처리)
+icon_file = 'icon.ico' if os.name == 'nt' and os.path.exists('icon.ico') else None
+
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('icon.png', '.')],
     hiddenimports=['api', 'agent_ctl'],
     hookspath=[],
     runtime_hooks=[],
@@ -34,4 +38,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=icon_file,
 )

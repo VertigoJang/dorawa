@@ -15,13 +15,20 @@ from PySide6.QtWidgets import (
     QStackedWidget, QScrollArea, QFrame,
 )
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QIcon
 
 from api import DorawaAPI, ApiError
 import agent_ctl
 
 CONFIG_FILE = os.path.expanduser("~/.config/dorawa-app.json")
 DEFAULT_SERVER = "https://dorawa.duckdns.org"
+
+
+def icon_path():
+    """실행/번들 양쪽에서 아이콘 경로를 찾는다."""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    p = os.path.join(base, "icon.png")
+    return p if os.path.exists(p) else ""
 
 
 def load_cfg():
@@ -365,6 +372,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Dorawa")
         self.resize(720, 520)
+        if icon_path():
+            self.setWindowIcon(QIcon(icon_path()))
         self.api = DorawaAPI()
 
         self.stack = QStackedWidget()
@@ -389,6 +398,8 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    if icon_path():
+        app.setWindowIcon(QIcon(icon_path()))
     w = MainWindow()
     w.show()
     sys.exit(app.exec())
