@@ -244,11 +244,22 @@ def logout():
     return redirect(url_for("login"))
 
 
+GITHUB_REPO = "https://github.com/VertigoJang/dorawa"
+RELEASES_URL = GITHUB_REPO + "/releases/latest"
+
+
+@app.get("/download")
+def download():
+    return render_template("download.html",
+                           github=GITHUB_REPO, releases=RELEASES_URL)
+
+
 @app.get("/")
 @login_required
 def dashboard():
     devices = db.devices_of_user(session["uid"])
-    return render_template("dashboard.html", uname=session["uname"], devices=devices)
+    return render_template("dashboard.html", uname=session["uname"],
+                           devices=devices, releases=RELEASES_URL)
 
 
 @app.post("/paircode")
