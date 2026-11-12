@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 """Dorawa 노트북 앱 (리눅스/윈도우).
 탭 2개:
-  - 내 기기 추적: 로그인 후 기기 목록, 도난 모드, 원격 촬영, 보고 조회
+  - 내 기기 추적: 로그인 후 기기 목록, 도난 모드, 원격 촬영, 보고 조회(사진·영상 인라인)
   - 이 기기 보호: 이 노트북을 에이전트로 등록(6자리 페어링), 웹캠 설정
 """
 import sys
 import json
 import os
+import urllib.request
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QTabWidget, QListWidget, QListWidgetItem,
     QTextEdit, QMessageBox, QCheckBox, QRadioButton, QSpinBox, QButtonGroup,
-    QStackedWidget, QScrollArea, QFrame,
+    QStackedWidget, QScrollArea, QFrame, QDialog,
 )
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QPixmap, QIcon
+from PySide6.QtCore import Qt, QThread, Signal, QUrl, QByteArray
+from PySide6.QtGui import QPixmap, QIcon, QDesktopServices
 
 from api import DorawaAPI, ApiError
 import agent_ctl
@@ -77,6 +78,15 @@ class Worker(QThread):
                 w.wait(ms)
             except Exception:
                 pass
+
+
+# ---------- 클릭 가능한 라벨 (썸네일용) ----------
+class ClickableLabel(QLabel):
+    clicked = Signal()
+
+    def mousePressEvent(self, e):
+        self.clicked.emit()
+        super().mousePressEvent(e)
 
 
 # ---------- 로그인 화면 ----------
@@ -191,18 +201,47 @@ class TrackTab(QWidget):
         cap.addWidget(self.video_btn)
         right.addLayout(cap)
 
-        right.addWidget(QLabel("최근 보고"))
-        self.reports = QTextEdit()
-        self.reports.setReadOnly(True)
-        right.addWidget(self.reports)
+        # 보고 헤더 + 새로고침
+        rep_head = QHBoxLayout()
+        rep_head.addWidget(QLabel("최근 보고"))
+        rep_head.addStretch()
+        self.rep_refresh = QPushButton("🔄 새로고침")
+        self.rep_refresh.clicked.connect(self.load_reports)
+        rep_head.addWidget(self.rep_refresh)
+        right.addLayout(rep_head)
+
+        # 보고 목록: 스크롤 카드 영역
+        self.reports_scroll = QScrollArea()
+        self.reports_scroll.setWidgetResizable(True)
+        self.reports_container = QWidget()
+        self.reports_vbox = QVBoxLayout(self.reports_container)
+        self.reports_vbox.setAlignment(Qt.AlignTop)
+        self.reports_scroll.setWidget(self.reports_container)
+        right.addWidget(self.reports_scroll)
+
         lay.addLayout(right, 2)
 
         self.load_devices()
 
+    # --- 보고 영역 헬퍼 ---
+    def _clear_reports(self):
+        while self.reports_vbox.count():
+            item = self.reports_vbox.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+    def _set_reports_message(self, text):
+        self._clear_reports()
+        lbl = QLabel(text)
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet("color:#666;")
+        self.reports_vbox.addWidget(lbl)
+
     def load_devices(self):
         self.w = Worker(self.api.devices)
         self.w.done.connect(self._fill_devices)
-        self.w.fail.connect(lambda m: self.reports.setText(m))
+        self.w.fail.connect(self._set_reports_message)
         self.w.start()
 
     def _fill_devices(self, devs):
@@ -242,7 +281,7 @@ class TrackTab(QWidget):
             return
         self.w3 = Worker(lambda: self.api.capture(self.cur_did, cmd))
         self.w3.done.connect(lambda _: QMessageBox.information(
-            self, "요청됨", "촬영 명령을 보냈습니다. 잠시 뒤 '최근 보고'를 새로고침하세요."))
+            self, "요청됨", "촬영 명령을 보냈습니다. 잠시 뒤 '🔄 새로고침'을 누르세요."))
         self.w3.fail.connect(lambda m: QMessageBox.warning(self, "오류", m))
         self.w3.start()
 
@@ -251,24 +290,152 @@ class TrackTab(QWidget):
             return
         self.w4 = Worker(lambda: self.api.reports(self.cur_did))
         self.w4.done.connect(self._show_reports)
-        self.w4.fail.connect(lambda m: self.reports.setText(m))
+        self.w4.fail.connect(self._set_reports_message)
         self.w4.start()
 
     def _show_reports(self, reps):
         import datetime
-        lines = []
+        self._clear_reports()
+        if not reps:
+            self._set_reports_message("아직 보고가 없습니다.")
+            return
         for r in reps:
+            card = QFrame()
+            card.setFrameShape(QFrame.StyledPanel)
+            cv = QVBoxLayout(card)
+
             t = datetime.datetime.fromtimestamp(r["ts"]).strftime("%Y-%m-%d %H:%M:%S")
-            lines.append("[%s]" % t)
-            lines.append("  IP: %s (%s)" % (r.get("public_ip") or "?", r.get("ip_desc") or ""))
+            head = QLabel("🕒 %s" % t)
+            head.setStyleSheet("font-weight:bold;")
+            cv.addWidget(head)
+
+            cv.addWidget(QLabel("IP: %s (%s)" % (
+                r.get("public_ip") or "?", r.get("ip_desc") or "")))
+
+            if r.get("wifi_ssid"):
+                cv.addWidget(QLabel("Wi-Fi: %s" % r["wifi_ssid"]))
+
             if r.get("lat"):
-                lines.append("  위치: https://maps.google.com/?q=%s,%s" % (r["lat"], r["lng"]))
+                loc = QLabel('위치: <a href="https://maps.google.com/?q=%s,%s">지도에서 보기</a>'
+                            % (r["lat"], r["lng"]))
+                loc.setOpenExternalLinks(True)
+                cv.addWidget(loc)
+
             if r.get("photo_url"):
-                lines.append("  사진: %s%s" % (self.api.base, r["photo_url"]))
+                self._add_photo(cv, self.api.base + r["photo_url"])
+
             if r.get("video_url"):
-                lines.append("  영상: %s%s" % (self.api.base, r["video_url"]))
-            lines.append("")
-        self.reports.setText("\n".join(lines) or "아직 보고가 없습니다.")
+                vurl = self.api.base + r["video_url"]
+                vbtn = QPushButton("🎥 영상 재생")
+                vbtn.clicked.connect(lambda checked=False, u=vurl: self._play_video(u))
+                cv.addWidget(vbtn)
+
+            self.reports_vbox.addWidget(card)
+        self.reports_vbox.addStretch()
+
+    def _add_photo(self, card_vbox, url):
+        lbl = ClickableLabel("사진 불러오는 중...")
+        lbl.setStyleSheet("color:#888;")
+        card_vbox.addWidget(lbl)
+
+        def load():
+            with urllib.request.urlopen(url, timeout=20) as resp:
+                return resp.read()
+
+        w = Worker(load)
+
+        def ok(data):
+            pix = QPixmap()
+            pix.loadFromData(QByteArray(data))
+            # 새로고침으로 목록이 교체되면 lbl(C++ 객체)이 이미 삭제됐을 수 있다.
+            try:
+                if pix.isNull():
+                    lbl.setText("사진 표시 실패")
+                    return
+                thumb = pix.scaledToWidth(240, Qt.SmoothTransformation)
+                lbl.setPixmap(thumb)
+                lbl.setText("")
+                lbl.setCursor(Qt.PointingHandCursor)
+                lbl.setToolTip("클릭하면 원본 크기로 보기")
+                lbl.clicked.connect(lambda: self._show_full_image(pix))
+            except RuntimeError:
+                return  # 라벨이 이미 삭제됨 — 무시
+
+        def fail_cb(m):
+            try:
+                lbl.setText("사진 불러오기 실패")
+            except RuntimeError:
+                pass
+
+        w.done.connect(ok)
+        w.fail.connect(fail_cb)
+        w.start()
+
+    def _show_full_image(self, pix):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("사진")
+        v = QVBoxLayout(dlg)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        big = QLabel()
+        big.setPixmap(pix)
+        big.setAlignment(Qt.AlignCenter)
+        scroll.setWidget(big)
+        v.addWidget(scroll)
+        dlg.resize(min(pix.width() + 40, 1000), min(pix.height() + 60, 800))
+        dlg.exec()
+
+    def _play_video(self, url):
+        # 앱 내 재생 시도, 실패하면 브라우저로 폴백
+        try:
+            from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+            from PySide6.QtMultimediaWidgets import QVideoWidget
+        except Exception as e:
+            QMessageBox.information(self, "영상",
+                "앱 내 영상 재생 모듈이 없어 브라우저로 엽니다.\n%s" % e)
+            QDesktopServices.openUrl(QUrl(url))
+            return
+        try:
+            dlg = QDialog(self)
+            dlg.setWindowTitle("영상")
+            dlg.resize(680, 560)
+            v = QVBoxLayout(dlg)
+
+            vw = QVideoWidget()
+            v.addWidget(vw)
+
+            player = QMediaPlayer(dlg)
+            audio = QAudioOutput(dlg)
+            player.setAudioOutput(audio)
+            player.setVideoOutput(vw)
+            player.setSource(QUrl(url))
+
+            ctl = QHBoxLayout()
+            toggle = QPushButton("⏯ 재생/일시정지")
+            toggle.clicked.connect(
+                lambda: player.pause()
+                if player.playbackState() == QMediaPlayer.PlayingState
+                else player.play())
+            open_ext = QPushButton("브라우저에서 열기")
+            open_ext.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))
+            ctl.addWidget(toggle)
+            ctl.addWidget(open_ext)
+            v.addLayout(ctl)
+
+            dlg.finished.connect(lambda _: player.stop())
+            player.play()
+            dlg.exec()
+            # 창을 닫을 때 플레이어를 명시적으로 정지·해제 (종료 크래시 방지)
+            try:
+                player.stop()
+                player.setVideoOutput(None)
+                player.setSource(QUrl())
+            except Exception:
+                pass
+        except Exception as e:
+            QMessageBox.information(self, "영상",
+                "앱 내 재생이 어려워 브라우저로 엽니다.\n%s" % e)
+            QDesktopServices.openUrl(QUrl(url))
 
 
 # ---------- 이 기기 보호 탭 ----------
